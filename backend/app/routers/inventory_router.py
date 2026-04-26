@@ -7,6 +7,7 @@ from app.services.dependency import get_current_user
 from app.models.pharmacy import Pharmacy
 from app.models.inventory import Inventory
 from app.models.medicine import Medicine
+import math
 
 router = APIRouter(prefix="/inventory", tags=["Inventory"])
 
@@ -34,39 +35,54 @@ def add_inventory(
         stock=item.stock,
         price=item.price
     )
-
-@router.get("/search")
-def search_medicine(name: str, db: Session = Depends(get_db)):
-    results = db.query(
-        Medicine.name,
-        Pharmacy.name,
-        Pharmacy.address.label("address"), 
-        Inventory.stock,
-        Inventory.price
-    ).join(
-        Inventory, Medicine.id == Inventory.medicine_id
-    ).join(
-        Pharmacy, Pharmacy.id == Inventory.pharmacy_id
-    ).filter(
-        Medicine.name.ilike(f"%{name}%"),
-        Inventory.stock > 0
-    ).order_by(
-        Inventory.price.asc()
-    ).all()
-
-    return [
-        {
-            "medicine": r[0],
-            "pharmacy": r[1],
-            "address": r[2],
-            "stock": r[3],
-            "price": r[4]
-        }
-        for r in results
-    ]
-
     db.add(new_item)
     db.commit()
     db.refresh(new_item)
 
     return new_item
+
+@router.get("/search")
+def search_medicine(
+    name: str,
+    user_lat: float,
+    user_lon: float,
+    db: Session = Depends(get_db)
+):
+    results = db.query(
+        Medicine.name.label("medicine"),
+        Pharmacy.name.label("pharmacy"),
+        Pharmacy.address,
+        Pharmacy.latitude,
+        Pharmacy.longitude,
+        Inventory.stock,
+        Inventory.price
+    ).join(
+        Inventory, Inventory.medicine_id == Medicine.id
+    ).join(
+        Pharmacy, Pharmacy.id == Inventory.pharmacy_id
+    ).filter(
+        Medicine.name.ilike(f"%{name}%"),
+        Inventory.stock > 0
+    ).all()
+
+    response = []
+
+    for r in results:
+        distance = math.sqrt(
+            (r.latitude - user_lat)**2 +
+            (r.longitude - user_lon)**2
+        )
+
+        response.append({
+            "medicine": r.medicine,
+            "pharmacy": r.pharmacy,
+            "address": r.address,
+            "stock": r.stock,
+            "price": r.price,
+            "distance": round(distance, 4)
+        })
+
+    # Sort by nearest
+    response.sort(key=lambda x: x["distance"])
+
+    return response

@@ -23,6 +23,8 @@ def create_pharmacy(
     new_pharmacy = Pharmacy(
         name=pharmacy.name,
         address=pharmacy.address,
+        latitude=pharmacy.latitude,
+        longitude=pharmacy.longitude,
         owner_id=current_user.id  # 🔥 important
     )
 
