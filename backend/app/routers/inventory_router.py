@@ -5,6 +5,8 @@ from app.models.inventory import Inventory
 from app.schemas.inventory_schema import InventoryCreate
 from app.services.dependency import get_current_user
 from app.models.pharmacy import Pharmacy
+from app.models.inventory import Inventory
+from app.models.medicine import Medicine
 
 router = APIRouter(prefix="/inventory", tags=["Inventory"])
 
@@ -32,6 +34,36 @@ def add_inventory(
         stock=item.stock,
         price=item.price
     )
+
+@router.get("/search")
+def search_medicine(name: str, db: Session = Depends(get_db)):
+    results = db.query(
+        Medicine.name,
+        Pharmacy.name,
+        Pharmacy.address.label("address"), 
+        Inventory.stock,
+        Inventory.price
+    ).join(
+        Inventory, Medicine.id == Inventory.medicine_id
+    ).join(
+        Pharmacy, Pharmacy.id == Inventory.pharmacy_id
+    ).filter(
+        Medicine.name.ilike(f"%{name}%"),
+        Inventory.stock > 0
+    ).order_by(
+        Inventory.price.asc()
+    ).all()
+
+    return [
+        {
+            "medicine": r[0],
+            "pharmacy": r[1],
+            "address": r[2],
+            "stock": r[3],
+            "price": r[4]
+        }
+        for r in results
+    ]
 
     db.add(new_item)
     db.commit()
