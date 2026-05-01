@@ -29,6 +29,9 @@ def add_inventory(
         Pharmacy.owner_id == current_user.id
     ).first()
 
+    if not pharmacy:
+        raise HTTPException(status_code=404, detail="Pharmacy not found")
+
     new_item = Inventory(
         pharmacy_id=pharmacy.id,
         medicine_id=item.medicine_id,
@@ -46,9 +49,12 @@ def search_medicine(
     name: str,
     user_lat: float,
     user_lon: float,
+    max_price: int = None,
+    min_stock: int = 0,
+    limit: int = 10,
     db: Session = Depends(get_db)
 ):
-    results = db.query(
+    query = db.query(
         Medicine.name.label("medicine"),
         Pharmacy.name.label("pharmacy"),
         Pharmacy.address,
@@ -62,8 +68,13 @@ def search_medicine(
         Pharmacy, Pharmacy.id == Inventory.pharmacy_id
     ).filter(
         Medicine.name.ilike(f"%{name}%"),
-        Inventory.stock > 0
-    ).all()
+        Inventory.stock > min_stock
+    )
+
+    if max_price is not None:
+        query = query.filter(Inventory.price <= max_price)
+
+    results = query.all()
 
     response = []
 
@@ -82,7 +93,6 @@ def search_medicine(
             "distance": round(distance, 4)
         })
 
-    # Sort by nearest
-    response.sort(key=lambda x: x["distance"])
+    response.sort(key=lambda x: (x["distance"], x["price"]))
 
-    return response
+    return response[:limit]
