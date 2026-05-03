@@ -1,3 +1,4 @@
+from fastapi import HTTPException
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from app.database import SessionLocal
@@ -96,3 +97,65 @@ def search_medicine(
     response.sort(key=lambda x: (x["distance"], x["price"]))
 
     return response[:limit]
+
+@router.put("/update/{inventory_id}")
+def update_inventory(
+    inventory_id: int,
+    item: InventoryCreate,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    inventory = db.query(Inventory).filter(
+        Inventory.id == inventory_id
+    ).first()
+
+    # ❌ Not found
+    if not inventory:
+        raise HTTPException(status_code=404, detail="Inventory not found")
+
+    # Get pharmacy
+    pharmacy = db.query(Pharmacy).filter(
+        Pharmacy.id == inventory.pharmacy_id
+    ).first()
+
+    # ❌ Not owner
+    if pharmacy.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    # ✅ Update
+    inventory.stock = item.stock
+    inventory.price = item.price
+
+    db.commit()
+    db.refresh(inventory)
+
+    return inventory
+
+@router.delete("/delete/{inventory_id}")
+def delete_inventory(
+    inventory_id: int,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    inventory = db.query(Inventory).filter(
+        Inventory.id == inventory_id
+    ).first()
+
+    if not inventory:
+        raise HTTPException(status_code=404, detail="Inventory not found")
+
+    pharmacy = db.query(Pharmacy).filter(
+        Pharmacy.id == inventory.pharmacy_id
+    ).first()
+
+    if pharmacy.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    db.delete(inventory)
+    db.commit()
+
+    return {"message": "Deleted successfully"}
+
+
+
+
