@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from app.database import SessionLocal
 from app.models.pharmacy import Pharmacy
 from app.schemas.pharmacy_schema import PharmacyCreate
-from app.services.dependency import get_current_user
+from app.services.dependency import get_current_user, require_role
 
 router = APIRouter(prefix="/pharmacy", tags=["Pharmacy"])
 
@@ -29,7 +29,18 @@ def create_pharmacy(
     )
 
     db.add(new_pharmacy)
+    # 🔥 ADD ROLE UPDATE HERE
+    if current_user.role == "patient":
+        current_user.role = "pharmacy_owner"
     db.commit()
     db.refresh(new_pharmacy)
 
     return new_pharmacy
+
+@router.get("/all-pharmacies")
+def get_all_pharmacies(
+    db: Session = Depends(get_db),
+    current_user = Depends(require_role("admin"))
+):
+    return db.query(Pharmacy).all()
+

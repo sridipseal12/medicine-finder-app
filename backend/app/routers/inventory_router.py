@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.database import SessionLocal
 from app.models.inventory import Inventory
 from app.schemas.inventory_schema import InventoryCreate
-from app.services.dependency import get_current_user
+from app.services.dependency import get_current_user, require_role
 from app.models.pharmacy import Pharmacy
 from app.models.inventory import Inventory
 from app.models.medicine import Medicine
@@ -23,7 +23,7 @@ def get_db():
 def add_inventory(
     item: InventoryCreate,
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    current_user = Depends(require_role("pharmacy_owner"))
 ):
     # Get user's pharmacy
     pharmacy = db.query(Pharmacy).filter(
@@ -103,7 +103,7 @@ def update_inventory(
     inventory_id: int,
     item: InventoryCreate,
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    current_user = Depends(require_role("pharmacy_owner"))
 ):
     inventory = db.query(Inventory).filter(
         Inventory.id == inventory_id
@@ -135,7 +135,7 @@ def update_inventory(
 def delete_inventory(
     inventory_id: int,
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    current_user = Depends(require_role("pharmacy_owner"))
 ):
     inventory = db.query(Inventory).filter(
         Inventory.id == inventory_id
@@ -155,7 +155,5 @@ def delete_inventory(
     db.commit()
 
     return {"message": "Deleted successfully"}
-
-
 
 

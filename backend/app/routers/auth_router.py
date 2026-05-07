@@ -9,6 +9,7 @@ from app.services.jwt_service import create_access_token
 from app.services.auth_service import verify_password
 from fastapi import HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
+from app.services.dependency import get_current_user, require_role
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -24,7 +25,8 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
     new_user = User(
         name=user.name,
         email=user.email,
-        password_hash=hash_password(user.password)
+        password_hash=hash_password(user.password),
+        role="patient"  
     )
     db.add(new_user)
     db.commit()
@@ -56,3 +58,12 @@ from app.services.dependency import get_current_user
 @router.get("/me")
 def get_me(user = Depends(get_current_user)):
     return {"current_user": user}
+
+@router.get("/all-users")
+def get_all_users(
+    db: Session = Depends(get_db),
+    current_user = Depends(require_role("admin"))
+):
+    return db.query(User).all()
+
+
