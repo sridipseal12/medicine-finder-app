@@ -30,6 +30,17 @@ def add_inventory(
         Pharmacy.owner_id == current_user.id
     ).first()
 
+    existing = db.query(Inventory).filter(
+        Inventory.pharmacy_id == pharmacy.id,
+        Inventory.medicine_id == item.medicine_id
+    ).first()
+
+    if existing:
+        raise HTTPException(
+            status_code=400,
+            detail="Medicine already exists in inventory"
+        )
+
     if not pharmacy:
         raise HTTPException(status_code=404, detail="Pharmacy not found")
 
@@ -53,6 +64,7 @@ def search_medicine(
     max_price: int = None,
     min_stock: int = 0,
     limit: int = 10,
+    skip: int = 0,
     db: Session = Depends(get_db)
 ):
     query = db.query(
@@ -75,7 +87,7 @@ def search_medicine(
     if max_price is not None:
         query = query.filter(Inventory.price <= max_price)
 
-    results = query.all()
+    results = query.offset(skip).limit(limit).all()
 
     response = []
 

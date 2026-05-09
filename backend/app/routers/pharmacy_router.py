@@ -20,6 +20,16 @@ def create_pharmacy(
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user)
 ):
+    existing = db.query(Pharmacy).filter(
+        Pharmacy.name == pharmacy.name,
+        Pharmacy.address == pharmacy.address
+    ).first()
+
+    if existing:
+        raise HTTPException(
+            status_code=400,
+            detail="Pharmacy with same name already exists in this address"
+        )
     new_pharmacy = Pharmacy(
         name=pharmacy.name,
         address=pharmacy.address,
