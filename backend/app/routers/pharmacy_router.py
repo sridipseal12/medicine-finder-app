@@ -1,18 +1,10 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from app.database import SessionLocal
 from app.models.pharmacy import Pharmacy
 from app.schemas.pharmacy_schema import PharmacyCreate
-from app.services.dependency import get_current_user, require_role
+from app.services.dependency import get_current_user, require_role, get_db
 
 router = APIRouter(prefix="/pharmacy", tags=["Pharmacy"])
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 @router.post("/create")
 def create_pharmacy(
@@ -41,6 +33,10 @@ def create_pharmacy(
     db.add(new_pharmacy)
     # 🔥 ADD ROLE UPDATE HERE
     if current_user.role == "patient":
+        # `current_user` may be attached to a different SQLAlchemy Session
+        # (created inside the auth dependency). Merge it into this request's
+        # Session so `db.commit()` persists the role update.
+        current_user = db.merge(current_user)
         current_user.role = "pharmacy_owner"
     db.commit()
     db.refresh(new_pharmacy)
